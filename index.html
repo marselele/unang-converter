@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bahasa Unang Converter</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: #020617;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 900px;
+      width: 100%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      border: 1px solid #1f2937;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      font-size: 0.9rem;
+      color: #9ca3af;
+      margin-bottom: 0.75rem;
+    }
+    .mode-switch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 1.25rem;
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+    .mode-switch select {
+      background: #020617;
+      color: #e5e7eb;
+      border-radius: 999px;
+      border: 1px solid #374151;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .mode-switch select:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px #38bdf8;
+    }
+    .flex {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .col {
+      flex: 1 1 280px;
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+      color: #9ca3af;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 140px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      background: #020617;
+      color: #e5e7eb;
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      box-sizing: border-box;
+    }
+    textarea:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px #38bdf8;
+    }
+    .output {
+      background: #020617;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+    .btn {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: none;
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #0ea5e9;
+    }
+    .badge {
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid #374151;
+      font-size: 0.7rem;
+    }
+    .examples {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+    .examples code {
+      background: #020617;
+      border-radius: 6px;
+      padding: 3px 6px;
+      border: 1px solid #1f2937;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Bahasa Unang Converter</h1>
+    <div class="subtitle">
+      Ketik teks di kiri, hasilnya muncul di kanan. Bisa bolak-balik Indo ↔ Unang.
+    </div>
+
+    <div class="mode-switch">
+      <span>Mode:</span>
+      <select id="modeSelect">
+        <option value="id2unang">Indonesia → Unang</option>
+        <option value="unang2id">Unang → Indonesia</option>
+      </select>
+      <span id="modeHint">(contoh: “si arsel ganteng” → unang)</span>
+    </div>
+
+    <div class="flex">
+      <div class="col">
+        <label for="inputText">Input</label>
+        <textarea id="inputText" placeholder="contoh: si arsel ganteng"></textarea>
+        <div class="toolbar">
+          <span class="badge">aturan: custom kamu 😎</span>
+          <button class="btn" id="clearBtn">Bersihkan</button>
+        </div>
+      </div>
+
+      <div class="col">
+        <label for="outputText">Output</label>
+        <textarea id="outputText" class="output" readonly></textarea>
+        <div class="toolbar">
+          <span id="charCount">0 karakter</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="examples">
+      Contoh arah Indonesia → Unang:
+      <br /> <code>peri</code> → <code>ura pening</code>
+      <br /> <code>kabarin</code> → <code>ubaran kananing</code>
+      <br /> <code>aku</code> → <code>uka anung</code>
+      <br /> <code>si arsel ganteng</code> → <code>si usal arneng utang ganeng</code>
+      <br /><br />
+      Contoh arah Unang → Indonesia:
+      <br /> <code>ura pening</code> → <code>peri</code>
+      <br /> <code>ubaran kananing</code> → <code>kabarin</code>
+      <br /> <code>uka anung</code> → <code>aku</code>
+    </div>
+  </div>
+
+  <script>
+    const vowels = "aiueoAIUEO";
+
+    function isVowel(ch) {
+      return vowels.indexOf(ch) !== -1;
+    }
+
+    function countVowels(word) {
+      let c = 0;
+      for (let ch of word) {
+        if (isVowel(ch)) c++;
+      }
+      return c;
+    }
+
+    // Pisah jadi {front, back} sesuai suku kata pertama vs sisanya
+    function splitFrontBack(word) {
+      const n = word.length;
+      let firstVowel = -1;
+
+      for (let i = 0; i < n; i++) {
+        if (isVowel(word[i])) {
+          firstVowel = i;
+          break;
+        }
+      }
+
+      if (firstVowel === -1) {
+        return { front: word, back: "" };
+      }
+
+      // gabung blok vokal pertama
+      let i = firstVowel + 1;
+      while (i < n && isVowel(word[i])) {
+        i++;
+      }
+
+      // kalau habis itu ada dua konsonan berurutan → pecah di tengah
+      let boundary;
+      if (i + 1 < n && !isVowel(word[i]) && !isVowel(word[i + 1])) {
+        boundary = i + 1;
+      } else {
+        boundary = i;
+      }
+
+      return {
+        front: word.slice(0, boundary),
+        back: word.slice(boundary)
+      };
+    }
+
+    function vowelToNa(v) {
+      v = v.toLowerCase();
+      switch (v) {
+        case "a": return "na";
+        case "i": return "ni";
+        case "u": return "nu";
+        case "e": return "ne";
+        case "o": return "no";
+        default: return "";
+      }
+    }
+
+    // === Arah Indonesia → Unang ===
+    function convertWordToUnang(word) {
+      // Kata 1 vokal (1 suku kata) → ga diubah
+      if (countVowels(word) <= 1) return word;
+
+      const { front, back } = splitFrontBack(word);
+
+      if (countVowels(back) === 0) return word;
+
+      // Kata pertama: "u" + (back dengan semua vokal diganti "a")
+      let backReplaced = "";
+      let vowelSeq = [];
+
+      for (let ch of back) {
+        if (isVowel(ch)) {
+          vowelSeq.push(ch.toLowerCase());
+          backReplaced += "a";
+        } else {
+          backReplaced += ch;
+        }
+      }
+
+      const firstPart = "u" + backReplaced.toLowerCase();
+
+      // Kata kedua: front + (na/ne/ni/no/nu per vokal belakang) + "ng"
+      let tail = "";
+      for (let v of vowelSeq) {
+        tail += vowelToNa(v);
+      }
+      tail += "ng";
+
+      const secondPart = front + tail;
+
+      return firstPart + " " + secondPart;
+    }
+
+    function convertTextToUnang(text) {
+      // Ganti tiap kata huruf (a-z) dengan versi unang
+      return text.replace(/[A-Za-z]+/g, (word) => convertWordToUnang(word));
+    }
+
+    // === Arah Unang → Indonesia ===
+
+    function isPureWord(w) {
+      return /^[A-Za-z]+$/.test(w);
+    }
+
+    function decodeUnangPair(w1, w2) {
+      const w1l = w1.toLowerCase();
+      const w2l = w2.toLowerCase();
+
+      if (!w1l.startsWith("u") || !w2l.endsWith("ng")) return null;
+
+      const backReplaced = w1l.slice(1);
+      const core = w2l.slice(0, -2); // buang "ng" di belakang
+
+      // ambil grup 'na/ne/ni/no/nu' dari belakang
+      const valid = ["na", "ne", "ni", "no", "nu"];
+      let groups = [];
+      let i = core.length;
+
+      while (i >= 2) {
+        const cand = core.slice(i - 2, i);
+        if (valid.includes(cand)) {
+          groups.unshift(cand);
+          i -= 2;
+        } else {
+          break;
+        }
+      }
+
+      const front = core.slice(0, i);
+      if (!groups.length) return null;
+
+      const mapV = { na: "a", ne: "e", ni: "i", no: "o", nu: "u" };
+      const vowelSeq = groups.map(g => mapV[g]);
+
+      // rekonstruksi back dengan isi vokal aslinya
+      let back = "";
+      let vi = 0;
+      for (let ch of backReplaced) {
+        if (ch === "a" && vi < vowelSeq.length) {
+          back += vowelSeq[vi++];
+        } else {
+          back += ch;
+        }
+      }
+      if (vi !== vowelSeq.length) return null;
+
+      return front + back;
+    }
+
+    function isUnangPair(w1, w2) {
+      if (!isPureWord(w1) || !isPureWord(w2)) return false;
+      const decoded = decodeUnangPair(w1, w2);
+      return decoded !== null;
+    }
+
+    function convertTextFromUnang(text) {
+      const trimmed = text.trim();
+      if (!trimmed) return "";
+
+      const parts = trimmed.split(/\s+/);
+      const out = [];
+      let i = 0;
+
+      while (i < parts.length) {
+        const w1 = parts[i];
+        const w2 = i + 1 < parts.length ? parts[i + 1] : null;
+
+        if (w2 && isUnangPair(w1, w2)) {
+          const original = decodeUnangPair(w1, w2);
+          out.push(original);
+          i += 2;
+        } else {
+          out.push(w1);
+          i += 1;
+        }
+      }
+
+      return out.join(" ");
+    }
+
+    // === UI logic ===
+
+    const input = document.getElementById("inputText");
+    const output = document.getElementById("outputText");
+    const charCount = document.getElementById("charCount");
+    const clearBtn = document.getElementById("clearBtn");
+    const modeSelect = document.getElementById("modeSelect");
+    const modeHint = document.getElementById("modeHint");
+
+    function updateOutput() {
+      const src = input.value;
+      let res = "";
+
+      if (modeSelect.value === "id2unang") {
+        res = convertTextToUnang(src);
+        modeHint.textContent = "(contoh: “si arsel ganteng” → unang)";
+      } else {
+        res = convertTextFromUnang(src);
+        modeHint.textContent = "(contoh: “si usal arneng utang ganeng” → balik ke Indo)";
+      }
+
+      output.value = res;
+      charCount.textContent = res.length + " karakter";
+    }
+
+    input.addEventListener("input", updateOutput);
+    modeSelect.addEventListener("change", () => {
+      // ganti placeholder biar gak bingung
+      if (modeSelect.value === "id2unang") {
+        input.placeholder = "contoh: si arsel ganteng";
+      } else {
+        input.placeholder = "contoh: si usal arneng utang ganeng";
+      }
+      updateOutput();
+    });
+
+    clearBtn.addEventListener("click", () => {
+      input.value = "";
+      updateOutput();
+      input.focus();
+    });
+
+    // contoh awal
+    input.value = "si arsel ganteng";
+    updateOutput();
+  </script>
+</body>
+</html>

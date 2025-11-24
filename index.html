@@ -143,13 +143,13 @@
         <option value="id2unang">Indonesia → Unang</option>
         <option value="unang2id">Unang → Indonesia</option>
       </select>
-      <span id="modeHint">(contoh: “si arsel ganteng” → unang)</span>
+      <span id="modeHint">(contoh: “peri aku di oh” → unang)</span>
     </div>
 
     <div class="flex">
       <div class="col">
         <label for="inputText">Input</label>
-        <textarea id="inputText" placeholder="contoh: si arsel ganteng"></textarea>
+        <textarea id="inputText" placeholder="contoh: peri aku di oh"></textarea>
         <div class="toolbar">
           <span class="badge">aturan: custom kamu 😎</span>
           <button class="btn" id="clearBtn">Bersihkan</button>
@@ -168,14 +168,19 @@
     <div class="examples">
       Contoh arah Indonesia → Unang:
       <br /> <code>peri</code> → <code>ura pening</code>
-      <br /> <code>kabarin</code> → <code>ubaran kananing</code>
       <br /> <code>aku</code> → <code>uka anung</code>
-      <br /> <code>si arsel ganteng</code> → <code>si usal arneng utang ganeng</code>
+      <br /> <code>di</code> → <code>uda ning</code>
+      <br /> <code>oh</code> → <code>uah nong</code>
+      <br /> <code>berpikir</code> → <code>ukar berpining</code>
+      <br /> <code>formula</code> → <code>ula formunang</code>
       <br /><br />
       Contoh arah Unang → Indonesia:
       <br /> <code>ura pening</code> → <code>peri</code>
-      <br /> <code>ubaran kananing</code> → <code>kabarin</code>
       <br /> <code>uka anung</code> → <code>aku</code>
+      <br /> <code>uda ning</code> → <code>di</code>
+      <br /> <code>uah nong</code> → <code>oh</code>
+      <br /> <code>ukar berpining</code> → <code>berpikir</code>
+      <br /> <code>ula formunang</code> → <code>formula</code>
     </div>
   </div>
 
@@ -194,7 +199,19 @@
       return c;
     }
 
-    // Pisah jadi {front, back} sesuai suku kata pertama vs sisanya
+    // posisi awal tiap "blok vokal" (kira-kira jumlah suku kata)
+    function vowelGroups(word) {
+      const groups = [];
+      for (let i = 0; i < word.length; i++) {
+        const ch = word[i];
+        if (isVowel(ch) && (i === 0 || !isVowel(word[i - 1]))) {
+          groups.push(i);
+        }
+      }
+      return groups;
+    }
+
+    // split 2 suku kata: suku pertama vs sisanya (aturan lama, masih dipakai)
     function splitFrontBack(word) {
       const n = word.length;
       let firstVowel = -1;
@@ -210,13 +227,11 @@
         return { front: word, back: "" };
       }
 
-      // gabung blok vokal pertama
       let i = firstVowel + 1;
       while (i < n && isVowel(word[i])) {
         i++;
       }
 
-      // kalau habis itu ada dua konsonan berurutan → pecah di tengah
       let boundary;
       if (i + 1 < n && !isVowel(word[i]) && !isVowel(word[i + 1])) {
         boundary = i + 1;
@@ -227,6 +242,26 @@
       return {
         front: word.slice(0, boundary),
         back: word.slice(boundary)
+      };
+    }
+
+    // split 3+ suku kata: semua sebelum suku terakhir vs suku terakhir
+    function splitLastSyllable(word) {
+      const vstarts = vowelGroups(word);
+      if (vstarts.length === 0) {
+        return { front: word, back: "" };
+      }
+      const last = vstarts[vstarts.length - 1];
+      let s = last;
+
+      // include satu konsonan sebelum vokal terakhir kalau ada
+      if (s - 1 >= 0 && !isVowel(word[s - 1])) {
+        s = s - 1;
+      }
+
+      return {
+        front: word.slice(0, s),
+        back: word.slice(s)
       };
     }
 
@@ -242,16 +277,37 @@
       }
     }
 
-    // === Arah Indonesia → Unang ===
+    // === Indonesia → Unang ===
     function convertWordToUnang(word) {
-      // Kata 1 vokal (1 suku kata) → ga diubah
-      if (countVowels(word) <= 1) return word;
+      const groups = vowelGroups(word);
+      if (groups.length === 0) return word; // ga ada vokal
 
-      const { front, back } = splitFrontBack(word);
+      let front = "";
+      let back = "";
+      let hasFront = false;
+
+      if (groups.length === 1) {
+        // 1 suku kata → front kosong, back = seluruh kata
+        front = "";
+        back = word;
+        hasFront = false;
+      } else {
+        hasFront = true;
+        if (groups.length === 2) {
+          // pakai pemenggalan lama
+          const fb = splitFrontBack(word);
+          front = fb.front;
+          back = fb.back;
+        } else {
+          // 3+ suku: semua sebelum suku terakhir vs suku terakhir
+          const fb = splitLastSyllable(word);
+          front = fb.front;
+          back = fb.back;
+        }
+      }
 
       if (countVowels(back) === 0) return word;
 
-      // Kata pertama: "u" + (back dengan semua vokal diganti "a")
       let backReplaced = "";
       let vowelSeq = [];
 
@@ -266,24 +322,22 @@
 
       const firstPart = "u" + backReplaced.toLowerCase();
 
-      // Kata kedua: front + (na/ne/ni/no/nu per vokal belakang) + "ng"
       let tail = "";
       for (let v of vowelSeq) {
         tail += vowelToNa(v);
       }
       tail += "ng";
 
-      const secondPart = front + tail;
+      const secondPart = hasFront ? (front + tail) : tail;
 
       return firstPart + " " + secondPart;
     }
 
     function convertTextToUnang(text) {
-      // Ganti tiap kata huruf (a-z) dengan versi unang
       return text.replace(/[A-Za-z]+/g, (word) => convertWordToUnang(word));
     }
 
-    // === Arah Unang → Indonesia ===
+    // === Unang → Indonesia ===
 
     function isPureWord(w) {
       return /^[A-Za-z]+$/.test(w);
@@ -296,13 +350,13 @@
       if (!w1l.startsWith("u") || !w2l.endsWith("ng")) return null;
 
       const backReplaced = w1l.slice(1);
-      const core = w2l.slice(0, -2); // buang "ng" di belakang
+      const core = w2l.slice(0, -2); // buang "ng"
 
-      // ambil grup 'na/ne/ni/no/nu' dari belakang
       const valid = ["na", "ne", "ni", "no", "nu"];
       let groups = [];
       let i = core.length;
 
+      // ambil grup na/ne/ni/no/nu dari belakang
       while (i >= 2) {
         const cand = core.slice(i - 2, i);
         if (valid.includes(cand)) {
@@ -319,7 +373,7 @@
       const mapV = { na: "a", ne: "e", ni: "i", no: "o", nu: "u" };
       const vowelSeq = groups.map(g => mapV[g]);
 
-      // rekonstruksi back dengan isi vokal aslinya
+      // balikin vokal yang tadinya diganti "a"
       let back = "";
       let vi = 0;
       for (let ch of backReplaced) {
@@ -380,10 +434,10 @@
 
       if (modeSelect.value === "id2unang") {
         res = convertTextToUnang(src);
-        modeHint.textContent = "(contoh: “si arsel ganteng” → unang)";
+        modeHint.textContent = "(contoh: “peri aku di oh” → unang)";
       } else {
         res = convertTextFromUnang(src);
-        modeHint.textContent = "(contoh: “si usal arneng utang ganeng” → balik ke Indo)";
+        modeHint.textContent = "(contoh: “ura pening uka anung uda ning...” → balik ke Indo)";
       }
 
       output.value = res;
@@ -392,11 +446,10 @@
 
     input.addEventListener("input", updateOutput);
     modeSelect.addEventListener("change", () => {
-      // ganti placeholder biar gak bingung
       if (modeSelect.value === "id2unang") {
-        input.placeholder = "contoh: si arsel ganteng";
+        input.placeholder = "contoh: peri aku di oh";
       } else {
-        input.placeholder = "contoh: si usal arneng utang ganeng";
+        input.placeholder = "contoh: ura pening uka anung uda ning uah nong";
       }
       updateOutput();
     });
@@ -407,8 +460,8 @@
       input.focus();
     });
 
-    // contoh awal
-    input.value = "si arsel ganteng";
+    // awalnya kosong aja
+    input.value = "";
     updateOutput();
   </script>
 </body>
